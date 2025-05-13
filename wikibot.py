@@ -1,93 +1,116 @@
-
 import string
 import wikipediaapi
 from summarizer import summarize_wikipedia as summarize
-import random
 import re
+from typing import Dict, Union
 
-def fetch_wikipedia_content(topic):
+def clean_text(text: str) -> str:
     """
-    Fetch content from Wikipedia using wikipedia-api and clean up excessive newlines.
+    Clean text by removing excessive spaces, control characters, and invalid unicode.
+    Returns: Cleaned text string
     """
-    clean_topic = topic.translate(str.maketrans('', '', string.punctuation)).strip().title()
+    if not text:
+        return ""
     
-    wiki_wiki = wikipediaapi.Wikipedia(language='en', user_agent='MyWikiBot/1.0 (https://mywikibot.local)')
-    page = wiki_wiki.page(clean_topic)
+    # Remove control characters and weird unicode
+    text = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', text)
     
-    if not page.exists():
-        return f"Error: Page '{clean_topic}' not found. Try a more specific topic."
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
     
-    content = page.text
+    # Remove random character sequences (like "0 | } A J k")
+    text = re.sub(r'[^a-zA-Z0-9\s.,;:!?\'"()-]', '', text)
+    
+    return text
 
-    # ✅ Replace multiple consecutive newlines with a single newline
-    content = re.sub(r'\n+', '\n', content)
+def fetch_wikipedia_content(topic: str) -> Union[str, Dict[str, str]]:
+    """
+    Fetch and clean Wikipedia content with robust error handling.
+    Returns: Cleaned content or error message
+    """
+    try:
+        # Clean the topic name
+        clean_topic = topic.translate(str.maketrans('', '', string.punctuation)).strip().title()
+        if not clean_topic:
+            return "Error: Empty topic after cleaning"
+        
+        # Initialize Wikipedia API with timeout
+        wiki_wiki = wikipediaapi.Wikipedia(
+            language='en',
+            user_agent='WikiBot/1.0',
+            extract_format=wikipediaapi.ExtractFormat.WIKI,  # Simplified format
+            timeout=10  # 10 second timeout
+        )
+        
+        page = wiki_wiki.page(clean_topic)
+        if not page.exists():
+            return f"Error: Wikipedia page for '{clean_topic}' not found"
+        
+        # Get and clean content
+        content = page.text
+        content = clean_text(content)
+        
+        # Ensure we have valid content
+        if not content or len(content.split()) < 10:
+            return "Error: Retrieved content is too short or invalid"
+            
+        return content
+    
+    except Exception as e:
+        return f"Error fetching content: {str(e)}"
 
-    return content
+def truncate_content(content: str, max_length: int) -> str:
+    """Safely truncate content at sentence boundary"""
+    if len(content) <= max_length:
+        return content
+    
+    truncated = content[:max_length]
+    last_period = truncated.rfind('.')
+    return truncated[:last_period + 1] if last_period > 0 else truncated
 
-def truncate_at_nearest_period(text, limit):
-    """
-    Truncate text at the nearest period before the limit to avoid cutting sentences.
-    """
-    if len(text) <= limit:
-        return text
-    cut_index = text.rfind('.', 0, limit)  # Find last period before limit
-    if cut_index == -1:  # No period found → fallback to hard cut
-        return text[:limit]
-    return text[:cut_index + 1]  # Include the period
-
-def generate_wikipedia_summary_and_questions(topic, max_summary_length=None, max_summary_input_length=10000):  # ✅ renamed param
-    """
-    Generate a summary from Wikipedia content and generate flashcards.
-    """
+def generate_wikipedia_summary(topic: str, max_input_length: int = 15000, summary_length: int = 300) -> Dict[str, Union[str, int]]:
+    """Generate cleaned Wikipedia content and summary."""
     content = fetch_wikipedia_content(topic)
     
-    if "Error" in content:
-        return content
-
-    # Display content stats
-    content_length = len(content)
-    word_count = len(content.split())
-    print(f"\n✅ Retrieved Wikipedia content: {content_length} characters, {word_count} words.")
+    if isinstance(content, str) and content.startswith("Error"):
+        return {"error": content}
     
-    # ✅ Handle original content truncation for display: 25,000 characters (stop at nearest period)
-    display_limit = 25000
-    if content_length > display_limit:
-        print(f"⚠️ Content exceeds {display_limit} characters. Truncating original content at nearest period before {display_limit}.")
-        original_content = truncate_at_nearest_period(content, display_limit)
-    else:
-        original_content = content
-
-    # ✅ For summarization, limit input to user-defined max_summary_input_length
-    if content_length > max_summary_input_length:
-        print(f"⚠️ Content exceeds {max_summary_input_length} characters. Truncating for summarization.")
-        summary_content = content[:max_summary_input_length]
-    else:
-        summary_content = content
+    # Clean and truncate original content for display
+    display_content = truncate_content(content, 25000)
     
-    # Decide summary length dynamically
-    if not max_summary_length:
-        max_summary_length = 300 if len(summary_content) > 1000 else 150
-
-    summary = summarize(summary_content, max_summary_length=max_summary_length)
-
+    # Prepare content for summarization (respect max_input_length)
+    summary_content = truncate_content(content, max_input_length)
+    
+    # Generate summary with specified length
+    try:
+        summary = summarize(summary_content, max_summary_length=summary_length)
+        summary = clean_text(summary)
+    except Exception as e:
+        summary = f"Error generating summary: {str(e)}"
+    
     return {
-        "original_content": original_content,
+        "original_content": display_content,
         "summary": summary,
-        "content_length": len(original_content),
-        "word_count": len(original_content.split())
+        "content_length": len(display_content),
+        "word_count": len(display_content.split())
     }
 
 if __name__ == "__main__":
+    # Command-line interface for testing
     topic = input("Enter the topic to search: ")
-    max_summary_input_length = int(input("Enter the max content size limit for summarization (in characters): "))  # ✅ renamed prompt
-    result = generate_wikipedia_summary_and_questions(topic, max_summary_input_length=max_summary_input_length)
-
-    if isinstance(result, dict):
-        print(f"\nWikipedia content for {topic} ({result['content_length']} characters, {result['word_count']} words):")
-        print(result["original_content"][:500] + "...\n")  # ✅ still previewing first 500 chars
-
+    try:
+        max_input = int(input("Enter max content size for summarization (characters): "))
+    except ValueError:
+        max_input = 10000
+    
+    result = generate_wikipedia_summary(topic, max_input_length=max_input)
+    
+    if "error" in result:
+        print(result["error"])
+    else:
+        print(f"\nWikipedia content for {topic}:")
+        print(f"Length: {result['content_length']} chars, {result['word_count']} words")
+        print("\nFirst 500 characters:")
+        print(result["original_content"][:500] + "...")
         print("\nSummary:")
         print(result["summary"])
-        
-    else:
-        print(result)
