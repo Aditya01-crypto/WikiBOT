@@ -69,7 +69,7 @@ Wikipedia-API for content fetching
 
 ![Summarization In Process](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotfetchcontentresult%20and%20summarization%20in%20process.png?raw=true)
 
-**AI powered Summarization Result **
+**AI powered Summarization Result**
 
 Here Medium SUmmarizatino was selected 
 
