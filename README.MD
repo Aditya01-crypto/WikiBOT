@@ -55,15 +55,26 @@ Hugging Face Transformers for the T5 model
 
 Wikipedia-API for content fetching
 
-**Working Image of WikiBot**
+##Working Image of WikiBot
+
+**Searching Quantum Computing in WikiBOT**
 
 ![Search Prompt](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotsearch.png?raw=true)
 
+**Fetching Details**
+
 ![Fetching Wiki Content](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotfetchingcontent.png?raw=true)
+
+**Fetched Content and Summarization In Process**
 
 ![Summarization In Process](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotfetchcontentresult%20and%20summarization%20in%20process.png?raw=true)
 
+**AI powered Summarization Result **
+
+Here Medium SUmmarizatino was selected 
+
 ![Final Result](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibot%20final%20result.png?raw=true)
+
 
 
 
