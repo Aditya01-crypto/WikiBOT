@@ -20,6 +20,7 @@ To install WikiBot and its dependencies:
 1. **Clone the repository:**
 ```bash
 git clone https://github.com/yourusername/wikibot.git
-cd wikibot```
+cd wikibot
+```
 
 1. **Clone the repository:**
