@@ -29,6 +29,7 @@ cd wikibot
 pip install -r requirements.txt
 ```
 3.**Download NLTK tokenizer data (required for sentence splitting):**
+
 Open a Python shell and run:
 ```bash
 import nltk
@@ -41,6 +42,7 @@ nltk.download('punkt')
 python app.py
 ```
 5.**How to Use**
+
 Enter a topic (e.g., "Quantum Computing")
 
 Click Fetch Content to retrieve the Wikipedia article
@@ -48,6 +50,7 @@ Click Fetch Content to retrieve the Wikipedia article
 Click Summarize to generate an AI summary
 
 **Credits**
+
 Hugging Face Transformers for the T5 model
 
 Wikipedia-API for content fetching
