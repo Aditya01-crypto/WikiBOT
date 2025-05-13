@@ -1,5 +1,5 @@
 # WikiBot  
-*Your personal Wikipedia-powered knowledge assistant, with automatic summarization and flashcards!*
+*Your personal Wikipedia-powered knowledge assistant, with automatic summarization !*
 
 WikiBot is a Python-based tool that allows you to fetch information from Wikipedia and automatically summarize it using AI models to assist with studying and information retention. It’s designed to help students, researchers, or curious minds quickly digest and retain knowledge from Wikipedia articles.
 
