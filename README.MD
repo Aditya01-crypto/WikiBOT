@@ -55,6 +55,17 @@ Hugging Face Transformers for the T5 model
 
 Wikipedia-API for content fetching
 
+**Working Image of WikiBot**
+
+![Search Prompt](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotsearch.png?raw=true)
+
+![Fetching Wiki Content](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotfetchingcontent.png?raw=true)
+
+![Summarization In Process](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibotfetchcontentresult%20and%20summarization%20in%20process.png?raw=true)
+
+![Final Result](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibot%20final%20result.png?raw=true)
+
+
 
 
 
