@@ -54,3 +54,6 @@ Click 'Summarize' to generate an AI summary
 Hugging Face Transformers for the T5 model
 
 Wikipedia-API for content fetching
+
+
+
