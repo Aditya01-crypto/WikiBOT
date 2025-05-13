@@ -45,9 +45,9 @@ python app.py
 
 Enter a topic (e.g., "Quantum Computing")
 
-Click Fetch Content to retrieve the Wikipedia article
+Click 'Fetch Content' to retrieve the Wikipedia article
 
-Click Summarize to generate an AI summary
+Click 'Summarize' to generate an AI summary
 
 **Credits**
 
