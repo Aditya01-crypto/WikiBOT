@@ -71,7 +71,7 @@ Wikipedia-API for content fetching
 
 **AI powered Summarization Result**
 
-Here Medium SUmmarizatino was selected 
+Here Medium Summarization option was selected 
 
 ![Final Result](https://github.com/Aditya01-crypto/WikiBOT/blob/main/wikibot%20final%20result.png?raw=true)
 
