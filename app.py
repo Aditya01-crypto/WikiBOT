@@ -1,265 +1,292 @@
-
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
-# from wikibot import generate_wikipedia_content  # We'll use this directly for better control
-from wikibot import fetch_wikipedia_content  # We'll use this directly for better control
+from tkinter import ttk, scrolledtext, messagebox, Menu
+from wikibot import generate_wikipedia_summary
 import threading
-import time
+import queue
+import logging
+
+logging.basicConfig(filename="wikibot.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class WikipediaSummarizerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("WikiBOT")
-        self.root.geometry("900x700")
+        self.root.title("WikiBOT - Wikipedia Content Summarizer")
+        self.root.geometry("1000x800")
+        self.root.minsize(800, 600)
         
-        # Thread control variables
-        self.fetch_thread = None
-        self.summarize_thread = None
-        self.stop_fetching = False
+        self.task_queue = queue.Queue()
+        self.running = False
+        self.current_content = None
         
-        # Configure styles
         self.style = ttk.Style()
-        self.style.configure('TButton', font=('Arial', 10))
+        self.style.configure('TButton', font=('Arial', 10), padding=5)
         self.style.configure('TLabel', font=('Arial', 10))
+        self.style.configure('TEntry', padding=5)
         
-        # Create main frames
-        self.top_frame = ttk.Frame(root, padding="10")
-        self.top_frame.pack(fill=tk.X)
+        self.create_widgets()
+        self.root.after(100, self.process_queue)
+    
+    def create_widgets(self):
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.middle_frame = ttk.Frame(root, padding="10")
-        self.middle_frame.pack(fill=tk.BOTH, expand=True)
+        # Control Frame
+        control_frame = ttk.Frame(main_frame, padding="10")
+        control_frame.pack(fill=tk.X)
         
-        self.bottom_frame = ttk.Frame(root, padding="10")
-        self.bottom_frame.pack(fill=tk.X)
+        ttk.Label(control_frame, text="Enter Topic:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.topic_entry = ttk.Entry(control_frame, width=40)
+        self.topic_entry.grid(row=0, column=1, sticky=tk.W, padx=5)
         
-        # Topic input
-        ttk.Label(self.top_frame, text="Enter Topic:").grid(row=0, column=0, sticky=tk.W)
-        self.topic_entry = ttk.Entry(self.top_frame, width=50)
-        self.topic_entry.grid(row=0, column=1, padx=5, sticky=tk.W)
+        ttk.Label(control_frame, text="Max Content Size:").grid(row=0, column=2, sticky=tk.W, padx=(10, 5))
+        max_size_label = ttk.Label(control_frame, text="15,000 chars (fixed)", foreground="gray")
+        max_size_label.grid(row=0, column=3, sticky=tk.W, padx=5)
         
-        # Max content size input
-        ttk.Label(self.top_frame, text="Max Content Size (chars):").grid(row=1, column=0, sticky=tk.W)
-        self.max_content_entry = ttk.Entry(self.top_frame, width=10)
-        self.max_content_entry.insert(0, "10000")  # Default value
-        self.max_content_entry.grid(row=1, column=1, padx=5, sticky=tk.W)
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=0, column=4, sticky=tk.E, padx=(10, 0))
         
-        # Buttons
-        self.fetch_btn = ttk.Button(self.top_frame, text="Fetch Content", command=self.fetch_content)
-        self.fetch_btn.grid(row=0, column=2, padx=5)
+        self.fetch_btn = ttk.Button(button_frame, text="Fetch Content", command=self.start_fetch)
+        self.fetch_btn.pack(side=tk.LEFT, padx=5)
         
-        self.summarize_btn = ttk.Button(self.top_frame, text="Summarize", command=self.start_summarize, state=tk.DISABLED)
-        self.summarize_btn.grid(row=0, column=3, padx=5)
+        self.summarize_btn = ttk.Button(
+            button_frame, 
+            text="Summarize", 
+            command=self.show_summary_options,
+            state=tk.DISABLED
+        )
+        self.summarize_btn.pack(side=tk.LEFT, padx=5)
         
-        self.clear_btn = ttk.Button(self.top_frame, text="Clear All", command=self.clear_all)
-        self.clear_btn.grid(row=0, column=4, padx=5)
+        self.clear_btn = ttk.Button(button_frame, text="Clear All", command=self.clear_all)
+        self.clear_btn.pack(side=tk.LEFT, padx=5)
         
-        # Content display
-        self.content_label = ttk.Label(self.middle_frame, text="Original Content:")
+        # Display Area
+        display_frame = ttk.Frame(main_frame)
+        display_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Content Display
+        content_frame = ttk.Frame(display_frame)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.content_label = ttk.Label(content_frame, text="Original Content:")
         self.content_label.pack(anchor=tk.W)
         
-        self.content_text = scrolledtext.ScrolledText(self.middle_frame, wrap=tk.WORD, height=15)
+        self.content_text = scrolledtext.ScrolledText(
+            content_frame,
+            wrap=tk.WORD,
+            font=('Arial', 10),
+            padx=10,
+            pady=10,
+            state=tk.DISABLED
+        )
         self.content_text.pack(fill=tk.BOTH, expand=True)
         
-        # Summary display
-        self.summary_label = ttk.Label(self.middle_frame, text="Summary:")
+        # Status Panel
+        self.status_panel = ttk.Label(
+            display_frame,
+            text="Status: Ready",
+            font=('Arial', 10),
+            padding=5,
+            relief=tk.SUNKEN,
+            anchor=tk.W
+        )
+        self.status_panel.pack(fill=tk.X, pady=5)
+        
+        # Summary Display
+        summary_frame = ttk.Frame(display_frame)
+        summary_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.summary_label = ttk.Label(summary_frame, text="Summary:")
         self.summary_label.pack(anchor=tk.W)
         
-        self.summary_text = scrolledtext.ScrolledText(self.middle_frame, wrap=tk.WORD, height=15)
+        self.summary_text = scrolledtext.ScrolledText(
+            summary_frame,
+            wrap=tk.WORD,
+            font=('Arial', 10),
+            padx=10,
+            pady=10,
+            state=tk.DISABLED
+        )
         self.summary_text.pack(fill=tk.BOTH, expand=True)
         
-        # Status bar
+        # Status Bar
         self.status_var = tk.StringVar()
         self.status_var.set("Ready")
-        self.status_bar = ttk.Label(self.bottom_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        self.status_bar = ttk.Label(
+            main_frame,
+            textvariable=self.status_var,
+            relief=tk.SUNKEN,
+            padding=(5, 5, 5, 5),
+            anchor=tk.W
+        )
         self.status_bar.pack(fill=tk.X)
-        
-        # Store fetched content
-        self.fetched_content = None
     
-    def fetch_content(self):
+    def show_summary_options(self):
+        """Show Small/Medium/Large options when Summarize is clicked."""
+        if not self.current_content:
+            messagebox.showerror("Error", "No content to summarize. Fetch content first!")
+            return
+
+        menu = Menu(self.root, tearoff=0)
+        menu.add_command(label="Small (150 words)", command=lambda: self.start_summarize(150))
+        menu.add_command(label="Medium (300 words)", command=lambda: self.start_summarize(300))
+        menu.add_command(label="Large (500 words)", command=lambda: self.start_summarize(500))
+        menu.tk_popup(self.summarize_btn.winfo_rootx(), self.summarize_btn.winfo_rooty() + 30)
+
+    
+    def start_fetch(self):
+        """Fetch Wikipedia content (fixed at 15,000 chars)."""
+        if self.running:
+            messagebox.showwarning("Warning", "Operation already in progress")
+            return
+            
         topic = self.topic_entry.get().strip()
         if not topic:
-            messagebox.showerror("Error", "Please enter a topic to search")
+            messagebox.showerror("Error", "Please enter a topic")
             return
+            
+        self.running = True
+        self.update_status("Fetching content... Please wait")
+        self._set_ui_state(fetching=True)
         
-        try:
-            max_content_size = int(self.max_content_entry.get())
-        except ValueError:
-            messagebox.showerror("Error", "Please enter a valid number for max content size")
-            return
-        
-        # Reset stop flag
-        self.stop_fetching = False
-        
-        self.status_var.set("Fetching Wikipedia content...")
-        self.root.update()
-        
-        # Disable buttons during fetch
-        self.fetch_btn.config(state=tk.DISABLED)
-        self.summarize_btn.config(state=tk.DISABLED)
-        
-        # Clear any existing content
+        self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
+        self.content_text.insert(tk.END, "Fetching content... Please wait")
+        self.content_text.config(state=tk.DISABLED)
+        
+        self.summary_text.config(state=tk.NORMAL)
         self.summary_text.delete(1.0, tk.END)
-        self.fetched_content = None
+        self.summary_text.config(state=tk.DISABLED)
         
-        # Run in a separate thread to prevent GUI freezing
-        self.fetch_thread = threading.Thread(
-            target=self._fetch_content_thread,
-            args=(topic, max_content_size),
+        threading.Thread(
+            target=self._fetch_content,
+            args=(topic, 15000),  # Fixed at 15,000 chars
             daemon=True
-        )
-        self.fetch_thread.start()
-        
-        # Start checking the thread status
-        self.check_fetch_thread()
+        ).start()
     
-    def check_fetch_thread(self):
-        if self.fetch_thread and self.fetch_thread.is_alive():
-            # Thread is still running, check again after 100ms
-            self.root.after(100, self.check_fetch_thread)
-        else:
-            # Thread has finished, clean up
-            self.fetch_thread = None
-    
-    def _fetch_content_thread(self, topic, max_content_size):
+    def _fetch_content(self, topic: str, max_chars: int):
+        logging.debug(f"Fetching content for topic: {topic}, max_chars: {max_chars}")
         try:
-            # Get the raw content first (we'll process it ourselves)
-            content = fetch_wikipedia_content(topic)
-            
-            # Check if we should stop
-            if self.stop_fetching:
-                self.status_var.set("Fetch cancelled")
-                return
-            
-            if "Error" in content:
-                self.status_var.set(content)
-                messagebox.showerror("Error", content)
-                return
-            
-            # Process the content
-            content_length = len(content)
-            word_count = len(content.split())
-            
-            # Handle original content truncation for display: 25,000 characters
-            display_limit = 25000
-            if content_length > display_limit:
-                original_content = self.truncate_at_nearest_period(content, display_limit)
+            result = generate_wikipedia_summary(topic, max_input_length=max_chars)
+            if "error" in result:
+                self.task_queue.put(("error", result["error"]))
             else:
-                original_content = content
-            
-            # For summarization, limit input to user-defined max_summary_input_length
-            if content_length > max_content_size:
-                summary_content = content[:max_content_size]
-            else:
-                summary_content = content
-            
-            # Store the results
-            self.fetched_content = {
-                "original_content": original_content,
-                "summary_content": summary_content,
-                "content_length": len(original_content),
-                "word_count": word_count
-            }
-            
-            # Update the GUI
-            if not self.stop_fetching:
-                self.content_text.delete(1.0, tk.END)
-                self.content_text.insert(tk.END, original_content)
-                self.summarize_btn.config(state=tk.NORMAL)
-                self.status_var.set(f"Fetched {word_count} words. Ready to summarize.")
-            
+                self.task_queue.put(("content", {
+                    "original_content": result["original_content"],
+                    "content_for_summary": result["original_content"][:max_chars],
+                    "word_count": result["word_count"]
+                }))
         except Exception as e:
-            if not self.stop_fetching:
-                self.status_var.set("Error occurred during fetch")
-                messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            self.task_queue.put(("error", f"Fetch error: {str(e)}"))
         finally:
-            if not self.stop_fetching:
-                self.fetch_btn.config(state=tk.NORMAL)
+            self.task_queue.put(("done", None))
     
-    def truncate_at_nearest_period(self, text, limit):
-        """Helper method to truncate text at the nearest period before limit"""
-        if len(text) <= limit:
-            return text
-        cut_index = text.rfind('.', 0, limit)
-        if cut_index == -1:
-            return text[:limit]
-        return text[:cut_index + 1]
-    
-    def start_summarize(self):
-        if not self.fetched_content:
-            messagebox.showerror("Error", "No content to summarize")
+    def start_summarize(self, summary_length: int):
+        """Generate summary with selected length."""
+        if not self.current_content or self.running:
+            messagebox.showerror("Error", "No content to summarize or operation in progress")
             return
+            
+        self.running = True
+        self.update_status(f"Generating {summary_length}-word summary... Please wait")
+        self._set_ui_state(summarizing=True)
         
-        self.status_var.set("Generating summary... Please wait")
+        self.summary_text.config(state=tk.NORMAL)
         self.summary_text.delete(1.0, tk.END)
-        self.summary_text.insert(tk.END, "Generating summary... Please wait...")
-        self.root.update()
+        self.summary_text.insert(tk.END, f"Generating {summary_length}-word summary... Please wait...")
+        self.summary_text.config(state=tk.DISABLED)
         
-        # Disable buttons during summarization
-        self.summarize_btn.config(state=tk.DISABLED)
-        self.fetch_btn.config(state=tk.DISABLED)
-        
-        # Run in a separate thread to prevent GUI freezing
-        self.summarize_thread = threading.Thread(
-            target=self._summarize_thread,
+        # Pass both max_content_size AND summary_length to wikibot
+        threading.Thread(
+            target=self._generate_summary,
+            args=(self.topic_entry.get().strip(), 15000, summary_length),  # Fixed 15k chars, variable summary length
             daemon=True
-        )
-        self.summarize_thread.start()
-        
-        # Start checking the thread status
-        self.check_summarize_thread()
-    
-    def check_summarize_thread(self):
-        if self.summarize_thread and self.summarize_thread.is_alive():
-            # Thread is still running, check again after 100ms
-            self.root.after(100, self.check_summarize_thread)
-        else:
-            # Thread has finished, clean up
-            self.summarize_thread = None
-    
-    def _summarize_thread(self):
+        ).start()
+
+    def _generate_summary(self, topic: str, max_chars: int, summary_length: int):
+        logging.debug(f"Summarizing {max_chars} chars to {summary_length} words")
         try:
-            # Simulate longer processing time for demonstration
-            time.sleep(1)
-            
-            # Check if we should stop (though summarization is usually quick)
-            if self.stop_fetching:
-                return
-            
-            # Get the summary (using the imported summarizer function)
-            from summarizer import summarize_wikipedia as summarize
-            summary = summarize(self.fetched_content["summary_content"])
-            
-            # Update the GUI
-            self.summary_text.delete(1.0, tk.END)
-            self.summary_text.insert(tk.END, summary)
-            self.status_var.set("Summary generated successfully")
-            
+            result = generate_wikipedia_summary(topic, 
+                                            max_input_length=max_chars,
+                                            summary_length=summary_length)
+            if "error" in result:
+                self.task_queue.put(("error", result["error"]))
+            else:
+                self.task_queue.put(("summary", result["summary"]))
         except Exception as e:
-            self.status_var.set("Error occurred during summarization")
-            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            self.task_queue.put(("error", f"Summary error: {str(e)}"))
         finally:
-            self.summarize_btn.config(state=tk.NORMAL)
+            self.task_queue.put(("done", None))
+        
+    def process_queue(self):
+        try:
+            while True:
+                task_type, data = self.task_queue.get_nowait()
+                if task_type == "content":
+                    self.current_content = data
+                    self._display_content(data["original_content"])
+                    self.update_status(f"Fetched {data['word_count']} words. Ready to summarize.")
+                    self.summarize_btn.config(state=tk.NORMAL)
+                elif task_type == "summary":
+                    self._display_summary(data)
+                    self.update_status("Summary complete")
+                elif task_type == "error":
+                    messagebox.showerror("Error", data)
+                    self.update_status("Error occurred", bar=False)
+                elif task_type == "done":
+                    self.running = False
+                    self._set_ui_state(idle=True)
+        except queue.Empty:
+            pass
+        self.root.after(100, self.process_queue)
+    
+    def _display_content(self, content: str):
+        self.content_text.config(state=tk.NORMAL)
+        self.content_text.delete(1.0, tk.END)
+        self.content_text.insert(tk.END, content)
+        self.content_text.config(state=tk.DISABLED)
+        self.content_text.see(tk.END)
+    
+    def _display_summary(self, summary: str):
+        self.summary_text.config(state=tk.NORMAL)
+        self.summary_text.delete(1.0, tk.END)
+        self.summary_text.insert(tk.END, summary)
+        self.summary_text.config(state=tk.DISABLED)
+        self.summary_text.see(tk.END)
+    
+    def update_status(self, message, panel=True, bar=True):
+        if panel:
+            self.status_panel.config(text=f"Status: {message}")
+        if bar:
+            self.status_var.set(message)
+        self.root.update()
+    
+    def _set_ui_state(self, fetching=False, summarizing=False, idle=False):
+        if idle:
             self.fetch_btn.config(state=tk.NORMAL)
+            self.summarize_btn.config(state=tk.NORMAL if self.current_content else tk.DISABLED)
+        elif fetching:
+            self.fetch_btn.config(state=tk.DISABLED)
+            self.summarize_btn.config(state=tk.DISABLED)
+        elif summarizing:
+            self.summarize_btn.config(state=tk.DISABLED)
+            self.fetch_btn.config(state=tk.DISABLED)
     
     def clear_all(self):
-        # Set the stop flag to cancel any ongoing operations
-        self.stop_fetching = True
-        
-        # Clear the UI elements
+        logging.debug("Clearing all GUI elements")
+        if self.running:
+            if messagebox.askyesno("Confirm", "Cancel current operation?"):
+                self.running = False
+                self.task_queue.queue.clear()
         self.topic_entry.delete(0, tk.END)
-        self.max_content_entry.delete(0, tk.END)
-        self.max_content_entry.insert(0, "10000")
+        self.current_content = None
+        self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
+        self.content_text.config(state=tk.DISABLED)
+        self.summary_text.config(state=tk.NORMAL)
         self.summary_text.delete(1.0, tk.END)
-        self.fetched_content = None
-        self.summarize_btn.config(state=tk.DISABLED)
-        self.status_var.set("Ready")
-        
-        # Re-enable buttons in case they were disabled
-        self.fetch_btn.config(state=tk.NORMAL)
-        self.summarize_btn.config(state=tk.DISABLED)
+        self.summary_text.config(state=tk.DISABLED)
+        self.update_status("Ready")
+        self._set_ui_state(idle=True)
 
 if __name__ == "__main__":
     root = tk.Tk()
