@@ -18,7 +18,7 @@ WikiBot is a Python-based tool that allows you to fetch information from Wikiped
 To install WikiBot and its dependencies:
 
 1. **Clone the repository:**
-```bash
+'''bash
 git clone https://github.com/yourusername/wikibot.git
 cd wikibot
 '''
