@@ -22,6 +22,7 @@ To install WikiBot and its dependencies:
 git clone https://github.com/yourusername/wikibot.git
 cd wikibot
 
+
 2. **Install Dependencies:**
 '''bash
 pip install -r requirements.txt
