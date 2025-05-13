@@ -17,30 +17,9 @@ WikiBot is a Python-based tool that allows you to fetch information from Wikiped
 
 To install WikiBot and its dependencies:
 
-Step 1: Clone the Repository
-bash
+1. **Clone the repository:**
+```bash
 git clone https://github.com/yourusername/wikibot.git
-cd wikibot
-Step 2: Install Dependencies
-bash
-pip install -r requirements.txt
-Step 3: Download NLTK Tokenizer Data
-WikiBot uses the NLTK tokenizer for sentence splitting. To download the required data, open a Python shell and run:
+cd wikibot```
 
-python
-import nltk
-nltk.download('punkt')
-Step 4: Run the Application
-bash
-python app.py
-How to Use
-Enter a topic (e.g., "Quantum Computing").
-
-Click "Fetch Content" to retrieve the Wikipedia article.
-
-Click "Summarize" to generate an AI-based summary.
-
-Credits
-Hugging Face Transformers for the T5 model
-
-Wikipedia-API for content fetching
+1. **Clone the repository:**
